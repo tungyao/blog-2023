@@ -24,10 +24,18 @@ var (
 )
 
 func main() {
-	// 初始化各种东西
+	// 初始化数据库
 	InitDb()
+
+	// 又一个缓存器
 	Caches = NewCache()
+
+	// 缓存器
 	Spruce = sp.CreateHash(1024)
+
+	// 加载进缓存
+	ReadFromDb()
+
 	r := uc.NewRouter()
 
 	// 路由器

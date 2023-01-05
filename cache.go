@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"log"
 	"sync"
 )
 
@@ -45,5 +46,13 @@ func (n *Cache) Get(name string) *Post {
 // 从数据库中读取缓存
 
 func ReadFromDb() {
-	Db.Query("select * from ")
+	rows, _ := Db.Query("select * from post")
+	for rows.Next() {
+		p := &Post{}
+		err := rows.Scan(&p.Name, &p.Data, &p.CreateTime, &p.UpdateTIme, &p.Permission, &p.IsDelete)
+		if err == nil {
+			Spruce.Set([]byte(p.Name), p, 0)
+		}
+	}
+	log.Println("cache is loaded")
 }

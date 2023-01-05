@@ -20,9 +20,17 @@ func IoRead(request uc.Request, pt any) error {
 	return nil
 }
 
-func page(request uc.Request) (int, int) {
-	page, _ := strconv.Atoi(request.URL.Query().Get("page"))
-	limit, _ := strconv.Atoi(request.URL.Query().Get("limit"))
+func pagination(request uc.Request) (int, int) {
+	p := request.URL.Query().Get("page")
+	if p == "" {
+		p = "1"
+	}
+	l := request.URL.Query().Get("limit")
+	if l == "" {
+		l = "10"
+	}
+	page, _ := strconv.Atoi(p)
+	limit, _ := strconv.Atoi(l)
 
 	return page - 1, limit
 }

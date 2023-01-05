@@ -2,8 +2,10 @@ package main
 
 import (
 	"crypto/sha1"
+	"encoding/json"
 	"fmt"
 	uc "github.com/tungyao/ultimate-cedar"
+	"log"
 	"net/http"
 	"time"
 )
@@ -21,16 +23,34 @@ type IndexCache struct {
 }
 
 func Index(writer uc.ResponseWriter, request uc.Request) {
-	limit, offset := page(request)
+	page, limit := pagination(request)
 	pageCache := Spruce.Get([]byte("index"))
+	log.Println(pageCache)
 	if pageCache == nil {
-		Db.Query("select * from post limit ? offset ?", limit*offset, offset)
+		out := make([]*Post, 0)
+		rows, _ := Db.Query("select * from post limit ? offset ?", limit, limit*page)
+		for rows.Next() {
+			p := &Post{}
+			err := rows.Scan(&p.Name, &p.Data, &p.CreateTime, &p.UpdateTIme, &p.Permission, &p.IsDelete)
+			if err == nil {
+				out = append(out, p)
+			}
+		}
+		data, _ := json.Marshal(out)
+		writer.Data(data).Send()
+		Spruce.Set([]byte("index"), data, time.Now().Unix()+3600)
+		return
 	}
 	writer.Data(pageCache).Send()
 }
 
 func OnlyOne(writer uc.ResponseWriter, request uc.Request) {
-	//data := Caches.Get(request.Data.Get("name"))
+	data := Spruce.Get([]byte(request.Data.Get("name")))
+	if data == nil {
+		writer.Data(`{}`).Status(404).Send()
+		return
+	}
+	writer.Data(data).Send()
 }
 
 func MgPostGet(writer uc.ResponseWriter, request uc.Request) {
