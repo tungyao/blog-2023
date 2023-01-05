@@ -2,9 +2,12 @@ package main
 
 import (
 	"crypto/sha1"
+	"embed"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	uc "github.com/tungyao/ultimate-cedar"
+	"html/template"
 	"io"
 	"log"
 	"net/http"
@@ -22,13 +25,17 @@ type Post struct {
 	IsDelete   int    `json:"is_delete,omitempty"`
 }
 
-type IndexCache struct {
+type IndexPageData struct {
+	Count int
+	Data  []*Post
 }
+
+//go:embed static
+var indexHtml embed.FS
 
 func Index(writer uc.ResponseWriter, request uc.Request) {
 	page, limit := pagination(request)
-	pageCache := Spruce.Get([]byte("index"))
-	log.Println(pageCache)
+	pageCache := Spruce.Get([]byte(fmt.Sprintf("%s %d %d", "index", page, limit)))
 	if pageCache == nil {
 		out := make([]*Post, 0)
 		rows, _ := Db.Query("select * from post where is_delete=0 limit ? offset ?", limit, limit*page)
@@ -39,12 +46,31 @@ func Index(writer uc.ResponseWriter, request uc.Request) {
 				out = append(out, p)
 			}
 		}
-		data, _ := json.Marshal(out)
-		writer.Data(data).Send()
-		Spruce.Set([]byte("index"), data, time.Now().Unix()+3600)
+		var count int
+		row := Db.QueryRow("select count(*) from post where is_delete=0")
+		row.Scan(&count)
+		c := &IndexPageData{
+			Count: count,
+			Data:  out,
+		}
+		pageCache = c
+		if request.URL.Query().Get("plat") == "api" {
+
+			data, _ := json.Marshal(out)
+			writer.Data(data).Send()
+			Spruce.Set([]byte(fmt.Sprintf("%s %d %d", "index", page, limit)), out, time.Now().Unix()+3600)
+			return
+		}
+	}
+	if request.URL.Query().Get("plat") == "api" {
+		writer.Data(pageCache).Send()
 		return
 	}
-	writer.Data(pageCache).Send()
+	// 渲染静态界面
+	t, err := template.ParseFS(indexHtml, "static/index.html")
+	log.Println(err)
+	err = t.Execute(writer, pageCache)
+	log.Println(err)
 }
 
 func OnlyOne(writer uc.ResponseWriter, request uc.Request) {
