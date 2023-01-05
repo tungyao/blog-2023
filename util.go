@@ -1,10 +1,13 @@
 package main
 
 import (
+	"crypto/sha1"
 	"encoding/json"
+	"fmt"
 	uc "github.com/tungyao/ultimate-cedar"
 	"io"
 	"strconv"
+	"time"
 )
 
 func IoRead(request uc.Request, pt any) error {
@@ -33,4 +36,12 @@ func pagination(request uc.Request) (int, int) {
 	limit, _ := strconv.Atoi(l)
 
 	return page - 1, limit
+}
+func Now() int64 {
+	return time.Now().Unix()
+}
+func Sha1(data []byte) string {
+	sh := sha1.New()
+	sh.Write(data)
+	return fmt.Sprintf("%x", sh.Sum(nil))
 }

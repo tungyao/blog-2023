@@ -18,6 +18,11 @@ func NewCache() *Cache {
 		data:  make(map[string]*Post),
 	}
 }
+func (n *Cache) Delete(name string) {
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
+	delete(n.data, name)
+}
 
 func (n *Cache) Update(name string, data *Post) {
 	n.mutex.Lock()
@@ -32,7 +37,7 @@ func (n *Cache) Get(name string) *Post {
 		n.mutex.Lock()
 		row := Db.QueryRow("select * from post where name=?", name)
 		dt := &Post{}
-		err := row.Scan(&dt.Name, &dt.Data, &dt.CreateTime, &dt.UpdateTIme, &dt.Permission, &dt.IsDelete)
+		err := row.Scan(&dt.Name, &dt.Data, &dt.CreateTime, &dt.UpdateTime, &dt.Permission, &dt.IsDelete)
 		if err != sql.ErrNoRows {
 			n.data[name] = dt
 		}
@@ -49,7 +54,7 @@ func ReadFromDb() {
 	rows, _ := Db.Query("select * from post")
 	for rows.Next() {
 		p := &Post{}
-		err := rows.Scan(&p.Name, &p.Data, &p.CreateTime, &p.UpdateTIme, &p.Permission, &p.IsDelete)
+		err := rows.Scan(&p.Name, &p.Data, &p.CreateTime, &p.UpdateTime, &p.Permission, &p.IsDelete)
 		if err == nil {
 			Spruce.Set([]byte(p.Name), p, 0)
 		}

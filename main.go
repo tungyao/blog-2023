@@ -12,7 +12,8 @@ import (
 
 const (
 	// DbPath sqlite 数据库地址
-	DbPath = "./main.db"
+	DbPath         = "./main.db"
+	FilePathPrefix = "./file/"
 )
 
 var (
@@ -36,6 +37,19 @@ func main() {
 	// 加载进缓存
 	ReadFromDb()
 
+	// 增加中间价
+	login := uc.MiddlewareInterceptor(func(writer uc.ResponseWriter, request uc.Request, handlerFunc uc.HandlerFunc) {
+		u := user[request.Header.Get("auth")]
+		if u != nil {
+			handlerFunc(writer, request)
+		} else {
+			writer.Data(`{"msg":"need login"}`).Status(401).Send()
+			return
+		}
+	})
+	middleware := uc.MiddlewareChain{
+		login,
+	}
 	r := uc.NewRouter()
 
 	// 路由器
@@ -45,17 +59,17 @@ func main() {
 
 	r.Group("mg", func(groups *uc.Groups) {
 
-		groups.Get("post", MgPostGet)
+		groups.Get("post", MgPostGet, middleware)
 
-		groups.Post("post", MgPostAdd)
+		groups.Post("post", MgPostAdd, middleware)
 
-		groups.Put("post", MgPostUpdate)
+		groups.Put("post", MgPostUpdate, middleware)
 
-		groups.Delete("post", MgPostDelete)
+		groups.Delete("post", MgPostDelete, middleware)
 
-		groups.Post("file", FileUpload)
+		groups.Post("file", FileUpload, middleware)
 
-		groups.Put("file", FileUpdate)
+		groups.Put("file", FileUpdate, middleware)
 
 		groups.Post("login", Login)
 	})
