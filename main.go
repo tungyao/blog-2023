@@ -55,6 +55,10 @@ func main() {
 	// 路由器
 	r.Get("/", Index)
 
+	r.Get("static/:file/:name", func(writer uc.ResponseWriter, request uc.Request) {
+		http.FileServer(http.Dir(".")).ServeHTTP(writer, request.Request)
+	})
+
 	r.Get("page/:name", OnlyOne)
 
 	r.Group("mg", func(groups *uc.Groups) {

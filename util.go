@@ -30,7 +30,7 @@ func pagination(request uc.Request) (int, int) {
 	}
 	l := request.URL.Query().Get("limit")
 	if l == "" {
-		l = "10"
+		l = "5"
 	}
 	page, _ := strconv.Atoi(p)
 	limit, _ := strconv.Atoi(l)

@@ -1,0 +1,24 @@
+.main {
+  display: flex;
+  width: 40vw;
+  margin-left: 30vw;
+  justify-content: center;
+  flex-flow: column nowrap;
+}
+.main > .list {
+  color: aquamarine;
+}
+.main > .list > .list-item {
+  min-width: 40vw;
+  margin: 10px;
+}
+.main > .list > .list-item > a {
+  width: 40vw;
+  display: flex;
+  flex-flow: column nowrap;
+  justify-content: center;
+}
+.main > .list > .list-item > a > span {
+  font-size: smaller;
+}
+/*# sourceMappingURL=app.css.map */

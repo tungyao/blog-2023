@@ -10,6 +10,7 @@ import (
 	"html/template"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strings"
@@ -25,9 +26,23 @@ type Post struct {
 	IsDelete   int    `json:"is_delete,omitempty"`
 }
 
+// 需要处理静态渲染的各种问题
+type PostPre struct {
+	Name             string `json:"name"`
+	Data             string `json:"data,omitempty"` // 原始文本
+	CreateTime       int64  `json:"create_time,omitempty"`
+	UpdateTime       int64  `json:"update_time,omitempty"`
+	CreateTimeFormat string `json:"create_time_format"` // 日期格式化
+	UpdateTimeFormat string `json:"update_time_format"` // 日期格式化
+	DataFormat       string `json:"data_format"`        // 加工之后的文本
+	SEO              string `json:"seo"`                // seo 的东西
+}
+
 type IndexPageData struct {
-	Count int
-	Data  []*Post
+	Count   int
+	Page    int // 当前是第几页
+	Data    []*PostPre
+	AllPage float64
 }
 
 //go:embed static
@@ -35,13 +50,16 @@ var indexHtml embed.FS
 
 func Index(writer uc.ResponseWriter, request uc.Request) {
 	page, limit := pagination(request)
+	log.Println(page, limit)
 	pageCache := Spruce.Get([]byte(fmt.Sprintf("%s %d %d", "index", page, limit)))
 	if pageCache == nil {
-		out := make([]*Post, 0)
-		rows, _ := Db.Query("select * from post where is_delete=0 limit ? offset ?", limit, limit*page)
+		out := make([]*PostPre, 0)
+		rows, _ := Db.Query("select `name`,`data`,`create_time`,`update_time` from post where is_delete=0 limit ? offset ?", limit, limit*page)
 		for rows.Next() {
-			p := &Post{}
-			err := rows.Scan(&p.Name, &p.Data, &p.CreateTime, &p.UpdateTime, &p.Permission, &p.IsDelete)
+			p := &PostPre{}
+			err := rows.Scan(&p.Name, &p.Data, &p.CreateTime, &p.UpdateTime)
+			p.CreateTimeFormat = time.Unix(p.CreateTime, 0).Format(time.RFC1123)
+			p.UpdateTimeFormat = time.Unix(p.UpdateTime, 0).Format(time.RFC1123)
 			if err == nil {
 				out = append(out, p)
 			}
@@ -49,13 +67,19 @@ func Index(writer uc.ResponseWriter, request uc.Request) {
 		var count int
 		row := Db.QueryRow("select count(*) from post where is_delete=0")
 		row.Scan(&count)
+		allPage := math.Ceil(float64(count) / 5)
+		log.Println(allPage, count)
+		if allPage == 0 {
+			allPage = 1
+		}
 		c := &IndexPageData{
-			Count: count,
-			Data:  out,
+			Count:   count,
+			Data:    out,
+			Page:    page + 1,
+			AllPage: allPage,
 		}
 		pageCache = c
 		if request.URL.Query().Get("plat") == "api" {
-
 			data, _ := json.Marshal(out)
 			writer.Data(data).Send()
 			Spruce.Set([]byte(fmt.Sprintf("%s %d %d", "index", page, limit)), out, time.Now().Unix()+3600)
@@ -67,7 +91,8 @@ func Index(writer uc.ResponseWriter, request uc.Request) {
 		return
 	}
 	// 渲染静态界面
-	t, err := template.ParseFS(indexHtml, "static/index.html")
+	//t, err := template.ParseFS(indexHtml, "static/index.html")
+	t, err := template.ParseFiles("./static/index.html")
 	log.Println(err)
 	err = t.Execute(writer, pageCache)
 	log.Println(err)
