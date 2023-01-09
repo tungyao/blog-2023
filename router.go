@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/sha1"
-	"embed"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -43,14 +42,24 @@ type IndexPageData struct {
 	Page    int // 当前是第几页
 	Data    []*PostPre
 	AllPage float64
+	Style   string
+	Js      string
 }
 
-//go:embed static
-var indexHtml embed.FS
+//go:embed static/html/index.html
+var indexHtml string
+
+//go:embed static/html/one.html
+var oneHtml string
+
+//go:embed static/css/app.css
+var indexCss string
+
+//go:embed static/js/app.js
+var indexJs string
 
 func Index(writer uc.ResponseWriter, request uc.Request) {
 	page, limit := pagination(request)
-	log.Println(page, limit)
 	pageCache := Spruce.Get([]byte(fmt.Sprintf("%s %d %d", "index", page, limit)))
 	if pageCache == nil {
 		out := make([]*PostPre, 0)
@@ -68,7 +77,6 @@ func Index(writer uc.ResponseWriter, request uc.Request) {
 		row := Db.QueryRow("select count(*) from post where is_delete=0")
 		row.Scan(&count)
 		allPage := math.Ceil(float64(count) / 5)
-		log.Println(allPage, count)
 		if allPage == 0 {
 			allPage = 1
 		}
@@ -77,7 +85,10 @@ func Index(writer uc.ResponseWriter, request uc.Request) {
 			Data:    out,
 			Page:    page + 1,
 			AllPage: allPage,
+			Style:   indexCss,
+			Js:      indexJs,
 		}
+
 		pageCache = c
 		if request.URL.Query().Get("plat") == "api" {
 			data, _ := json.Marshal(out)
@@ -92,10 +103,21 @@ func Index(writer uc.ResponseWriter, request uc.Request) {
 	}
 	// 渲染静态界面
 	//t, err := template.ParseFS(indexHtml, "static/index.html")
-	t, err := template.ParseFiles("./static/index.html")
+	t, err := template.New("index.html").Funcs(template.FuncMap{
+		"css": func(str string) template.CSS {
+			return template.CSS(str)
+		},
+		"js": func(str string) template.JS {
+			return template.JS(str)
+		},
+	}).Parse(indexHtml)
+	err = t.Execute(writer.ResponseWriter, pageCache)
 	log.Println(err)
-	err = t.Execute(writer, pageCache)
-	log.Println(err)
+}
+
+type OneData struct {
+	Style string
+	Data  *Post
 }
 
 func OnlyOne(writer uc.ResponseWriter, request uc.Request) {
@@ -104,7 +126,24 @@ func OnlyOne(writer uc.ResponseWriter, request uc.Request) {
 		writer.Data(`{}`).Status(404).Send()
 		return
 	}
-	writer.Data(data).Send()
+	if request.URL.Query().Get("plat") == "api" {
+		writer.Data(data).Send()
+		return
+	}
+	t, err := template.New("one.html").Funcs(template.FuncMap{
+		"css": func(str string) template.CSS {
+			return template.CSS(str)
+		},
+		"js": func(str string) template.JS {
+			return template.JS(str)
+		},
+	}).Parse(oneHtml)
+	onePage := &OneData{
+		Style: indexCss,
+		Data:  data.(*Post),
+	}
+	err = t.Execute(writer.ResponseWriter, onePage)
+	log.Println(err)
 }
 
 func MgPostGet(writer uc.ResponseWriter, request uc.Request) {
